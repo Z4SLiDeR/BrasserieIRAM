@@ -12,7 +12,7 @@ namespace Brasserie
     public static class MauiProgram
     {
 
-        private const string CONFIG_FILE = @"C:\POO\MAUI\Brasserie\Brasserie\Configuration\Datas\Config.txt";
+        private const string CONFIG_FILE = @"C:\POO\MAUI\Brasserie\Brasserie\Configuration\Datas\ConfigSQL.txt";
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
@@ -25,6 +25,11 @@ namespace Brasserie
                 })
                 .UseMauiCommunityToolkit();
             DataFilesManager dataFilesManager = new DataFilesManager(CONFIG_FILE);
+
+            //dependency injection for AlertServiceDisplay 
+            builder.Services.AddSingleton<IAlertService>(new AlertServiceDisplay());
+            AlertServiceDisplay alertService = new AlertServiceDisplay();
+
             /*
             Services.AddSingleton() permet de faire de l'injection de dépendance dans le constructeur des ViewModel par exemple
             sans devoir faire un new DataAccessJsonFile() dans celui-ci
@@ -32,9 +37,10 @@ namespace Brasserie
             tandis qu'elle est recréée à chaque fois qu'on en a besoin quand on fait du .AddTransient()
             Les Services doivent être vu comme un conteneur de services disponibles ailleurs. Il contient toutes les instances spécifiées dans les <>
             */
-            //Singleton for AlertServiceDisplay
-            builder.Services.AddSingleton<IAlertService>(new AlertServiceDisplay());
-            builder.Services.AddSingleton<IDataAccess>(new DataAccessJsonFile(dataFilesManager));
+
+            //builder.Services.AddSingleton<IDataAccess>(new DataAccessJsonFile(dataFilesManager));
+            builder.Services.AddSingleton<IDataAccess>(new DataAccessSql(dataFilesManager,alertService));
+
             //permet de faire de l'injection de dépendance dans le constructeur de la MainPage sans devoir faire un new MainPageViewModel() dans celui-ci
             builder.Services.AddTransient<MainPageViewModel>();
             builder.Services.AddTransient<MainPage>();
