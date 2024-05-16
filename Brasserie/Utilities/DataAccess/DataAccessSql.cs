@@ -4,11 +4,13 @@ using Brasserie.Model.Restaurant.People;
 using Brasserie.Utilities.DataAccess.Files;
 using Brasserie.Utilities.Interfaces;
 using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Storage.Streams;
 
 namespace Brasserie.Utilities.DataAccess
 {
@@ -18,10 +20,10 @@ namespace Brasserie.Utilities.DataAccess
         {
             try
             {
-                //AccessPath = DataFilesManager.DataFiles.GetValueByCodeFunction("CONNECTION_STRING");
-                const string CONN_STRING = @"Data Source = JEREMY\MSSQLSERVER02; Initial Catalog = BrasserieDatabase; Integrated Security = True; Trust Server Certificate = True";
+                AccessPath = DataFilesManager.DataFiles.GetValueByCodeFunction("CONNECTION_STRING");
+                //const string CONN_STRING = @"Data Source = JEREMY\MSSQLSERVER02; Initial Catalog = BrasserieDatabase; Integrated Security = True; Trust Server Certificate = True";
                 //const string CONN_STRING = @"Data Source=JEREMY\MSSQLSERVER02;Initial Catalog=BrasserieDatabase;User Id = IRAM_USER; Password = 123456;Encrypt=false;TrustServerCertificate=true;";
-                SqlConnection = new SqlConnection(CONN_STRING);
+                SqlConnection = new SqlConnection(AccessPath);
                 SqlConnection.Open();
             }
             catch (Exception ex)
@@ -131,43 +133,71 @@ namespace Brasserie.Utilities.DataAccess
             throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// Update StaffMembers database table from the staff members collection.
-        /// </summary>
-        /// <param name="staffMembers">Collection of staff members to update</param>
-        /// <returns>True if the update was successful, otherwise false</returns>
         public override bool UpdateAllStaffMembers(StaffMembersCollection staffMembers)
         {
             string sql = string.Empty;
-
             try
             {
+                // Récupérer tous les IDs depuis le serveur SQL
+                List<int> sqlIds = new List<int>();
+                string sqlQuery = $"SELECT Id FROM StaffMembers";
+                SqlCommand selectCommand = new SqlCommand(sqlQuery, SqlConnection); // Renommage de la variable ici
+                SqlDataReader reader = selectCommand.ExecuteReader();
+                while (reader.Read())
+                {
+                    sqlIds.Add(reader.GetInt32(0));
+                }
+                reader.Close();
+                // Comparer les IDs avec ceux dans votre programme
+                List<int> programIds = new List<int>();
                 foreach (StaffMember sm in staffMembers)
                 {
-                    // If the ID already exists in the database, update its values; otherwise, insert it as a new record.
-                    sql = IsInDb(sm.Id, "Id", "StaffMembers") ? GetSqlUpdateStaffMember(sm) : GetSqlInsertStaffMember(sm);
+                    programIds.Add(sm.Id);
+                }
+                // Trouver les IDs manquants
+                List<int> missingIds = sqlIds.Except(programIds).ToList();
 
+                // Supprimer les IDs manquants de votre programme
+                foreach (int missingId in missingIds)
+                {
+                    // Supprimer l'ID manquant de votre base de données
+                    string deleteSql = $"DELETE FROM StaffMembers WHERE Id = {missingId}";
+                    SqlCommand deleteCommand = new SqlCommand(deleteSql, SqlConnection);
+                    deleteCommand.ExecuteNonQuery();
+                }
+
+                foreach (StaffMember sm in staffMembers)
+                {
+
+                    //if id already in databse, update his values, insert in the other case
+                    sql = IsInDb(sm.Id, "Id", "StaffMembers") ? GetSqlUpdateStaffMember(sm) : GetSqlInsertStaffMember(sm);
                     if (!string.IsNullOrEmpty(sql))
                     {
-                        // Execute the SQL command.
+                        //Console.WriteLine(sql);
                         SqlCommand command = new SqlCommand(sql, SqlConnection);
-                        int insertedId = Convert.ToInt32(command.ExecuteScalar()); // Get the auto-generated ID from the database.
-
+                        //command.ExecuteNonQuery(); //common Execute without getting id value
+                        //get id autocreated by the database (when update insertedId = 0)
+                        int insertedId = Convert.ToInt32(command.ExecuteScalar());
                         if (insertedId > 0)
                         {
-                            sm.Id = insertedId; // Update the ID of the staff member.
+                            sm.Id = insertedId;
                         }
+                    }
+                    else
+                    {
+
                     }
                 }
 
-                return true; // Update successful.
+                return true;
             }
             catch (Exception ex)
             {
-                // Handle exceptions and show an alert.
-                alertService.ShowAlert("Database Request Error", $"{ex.Message} \nSQL Query : {sql}");
-                return false; // Update failed.
+                alertService.ShowAlert("Database Request Error", $"{ex.Message} \nSQL Query: {sql}");
+                return false;
             }
+
+
         }
 
 
@@ -219,34 +249,24 @@ namespace Brasserie.Utilities.DataAccess
 
 
         /// <summary>
-        /// Creates a SQL request to insert a new staff member into the database with their properties.
+        /// create a sql request. Insert the staffMember fonction of his type and his internal properties values.
         /// </summary>
-        /// <param name="sm">Staff member object to insert</param>
-        /// <returns>SQL INSERT request</returns>
+        /// <param name="sm"></param>
+        /// <returns>sql INSERT request</returns>
         private string GetSqlInsertStaffMember(StaffMember sm)
         {
-            // Get the type of the staff member.
             string[] strType = sm.GetType().ToString().Split('.');
             string type = strType[strType.Length - 1];
-
             switch (type)
+
             {
                 case "StaffMember":
-                    // Construct SQL query for inserting a StaffMember.
-                    return $"INSERT INTO StaffMembers (Type, FirstName, LastName, Address, MobilePhone, EMail, Gender, BankAccount) " +
-                           $"VALUES ('{type}', '{sm.FirstName}', '{sm.LastName}', '{sm.Address}', '{sm.MobilePhoneNumber}', '{sm.Email}', " +
-                           $"{BoolSqlConvert(sm.Gender)}, '{sm.BankAccount}'); SELECT SCOPE_IDENTITY();";
 
+                    return $"INSERT INTO StaffMembers (Type, FirstName ,LastName,Address, MobilePhone, EMail, Gender, BankAccount, Salary) VALUES('{type}','{sm.FirstName}','{sm.LastName}','{sm.Address}','{sm.MobilePhoneNumber}','{sm.Email}',{BoolSqlConvert(sm.Gender)},'{sm.BankAccount}',{sm.GetSalary});SELECT SCOPE_IDENTITY();";
                 case "Manager":
-                    // Cast to Manager object.
                     Manager m = (Manager)sm;
-                    // Construct SQL query for inserting a Manager.
-                    return $"INSERT INTO StaffMembers (Type, FirstName, LastName, Address, MobilePhone, EMail, Gender, BankAccount, Login) " +
-                           $"VALUES ('{type}', '{sm.FirstName}', '{sm.LastName}', '{sm.Address}', '{sm.MobilePhoneNumber}', '{sm.Email}', " +
-                           $"{BoolSqlConvert(sm.Gender)}, '{sm.BankAccount}', '{m.Login}'); SELECT SCOPE_IDENTITY();";
-
+                    return $"INSERT INTO StaffMembers (Type, FirstName ,LastName,Address, MobilePhone, EMail, Gender, BankAccount, Salary, Login ) VALUES('{type}','{sm.FirstName}','{sm.LastName}','{sm.Address}','{sm.MobilePhoneNumber}','{sm.Email}',{BoolSqlConvert(sm.Gender)},'{sm.BankAccount}',{sm.GetSalary},'{m.Login}');SELECT SCOPE_IDENTITY();";
                 default:
-                    // If the type is not recognized, return null.
                     return null;
             }
         }

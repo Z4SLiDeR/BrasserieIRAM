@@ -96,6 +96,10 @@ namespace Brasserie.Model.Restaurant.People
         #region Methodes
 
         /// <summary>
+        /// Propriété d'accès au salaire en lecture seule
+        ///  </summary>
+        public double GetSalary => Salary;
+        /// <summary>
         /// staff member ask a leave for a period of time
         /// </summary>
         public void LeaveRequest()
