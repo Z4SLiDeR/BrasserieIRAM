@@ -24,7 +24,6 @@
 
         <DataTemplate x:Key="ListViewItemTemplate">
             <ViewCell>
-
                 <Grid Padding="5">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

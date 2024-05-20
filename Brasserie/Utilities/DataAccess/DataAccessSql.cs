@@ -18,10 +18,10 @@ namespace Brasserie.Utilities.DataAccess
         {
             try
             {
-                //AccessPath = DataFilesManager.DataFiles.GetValueByCodeFunction("CONNECTION_STRING");
-                const string CONN_STRING = @"Data Source = JEREMY\MSSQLSERVER02; Initial Catalog = BrasserieDatabase; Integrated Security = True; Trust Server Certificate = True";
+                AccessPath = DataFilesManager.DataFiles.GetValueByCodeFunction("CONNECTION_STRING");
+                //const string CONN_STRING = @"Data Source = JEREMY\MSSQLSERVER02; Initial Catalog = BrasserieDatabase; Integrated Security = True; Trust Server Certificate = True";
                 //const string CONN_STRING = @"Data Source=JEREMY\MSSQLSERVER02;Initial Catalog=BrasserieDatabase;User Id = IRAM_USER; Password = 123456;Encrypt=false;TrustServerCertificate=true;";
-                SqlConnection = new SqlConnection(CONN_STRING);
+                SqlConnection = new SqlConnection(AccessPath);
                 SqlConnection.Open();
             }
             catch (Exception ex)
